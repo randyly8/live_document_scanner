@@ -1,49 +1,10 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/objdetect.hpp>
 #include <iostream>
 
 using namespace std;
 using namespace cv;
-
-vector<Point> getContours(Mat& imageThre, Mat& imageOriginal) {
-
-	vector<vector<Point>> contours;
-	vector<Vec4i> hierarchy;
-
-	findContours(imageThre, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
-	//drawContours(img, contours, -1, Scalar(255, 0, 255), 2);
-	vector<vector<Point>> conPoly(contours.size());
-	vector<Rect> boundRect(contours.size());
-
-	vector<Point> biggest;
-	int maxArea=0;
-
-	for (int i = 0; i < contours.size(); i++)
-	{
-		int area = contourArea(contours[i]);
-		//cout << area << endl;
-
-		string objectType;
-
-		if (area > 1000)
-		{
-			float peri = arcLength(contours[i], true);
-			approxPolyDP(contours[i], conPoly[i], 0.02 * peri, true);
-
-			if (area > maxArea && conPoly[i].size() == 4 ) {
-
-				//drawContours(imgOriginal, conPoly, i, Scalar(255, 0, 255), 5);
-				biggest = { conPoly[i][0],conPoly[i][1] ,conPoly[i][2] ,conPoly[i][3] };
-				maxArea = area;
-			}
-			drawContours(imageOriginal, conPoly, i, Scalar(255, 0, 255), 2);
-			rectangle(imageOriginal, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 255, 0), 5);
-		}
-	}
-	return biggest;
-}
 
 cv::Mat preProcessImage(Mat& imageOriginal)
 {
@@ -55,13 +16,50 @@ cv::Mat preProcessImage(Mat& imageOriginal)
     // Canny
     Canny(res, res, 50, 150);
 
-    // create kernal for dilation
+    // Create kernal for dilation
     Mat kernel = getStructuringElement(MORPH_RECT, Size(5,5));
     dilate(res, res, kernel);
+
     return res;
-    //cv::erode(res, res, kernel);
 }
 
+// Find contours of the document
+vector<Point> getContours(Mat& imageThre, Mat& imageOriginal) {
+
+	vector<vector<Point>> contours;
+	vector<Vec4i> hierarchy;
+
+	findContours(imageThre, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+	vector<vector<Point>> conPoly(contours.size());
+	vector<Rect> boundRect(contours.size());
+
+	vector<Point> biggest;
+	int maxArea=0;
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		int area = contourArea(contours[i]);
+		string objectType;
+
+		if (area > 1000)
+		{
+			float peri = arcLength(contours[i], true);
+			approxPolyDP(contours[i], conPoly[i], 0.02 * peri, true);
+
+			if (area > maxArea && conPoly[i].size() == 4 ) 
+            {
+				biggest = { conPoly[i][0],conPoly[i][1] ,conPoly[i][2] ,conPoly[i][3] };
+				maxArea = area;
+			}
+			//drawContours(imageOriginal, conPoly, i, Scalar(255, 0, 255), 2);
+			rectangle(imageOriginal, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 255, 0), 5);
+		}
+	}
+	return biggest;
+}
+
+// Used to draw and label point of a document
 void drawPoints(vector<Point> points, Scalar color, Mat& image)
 {
     for (int i = 0; i < points.size(); i++)
@@ -71,6 +69,7 @@ void drawPoints(vector<Point> points, Scalar color, Mat& image)
     }
 }
 
+// Reorder the points on document for consistency
 vector<Point> reorder(vector<Point>& pts)
 {
 
@@ -91,11 +90,21 @@ vector<Point> reorder(vector<Point>& pts)
 	return newpts;
 }
 
-// Document scnner
+void Warp(Mat& imageOriginal, Mat& imgWarp, vector<Point>& docPts, float& w, float& h)
+{
+    Point2f src[4] = {docPts[0], docPts[1], docPts[2], docPts[3]};
+    Point2f dst[4] = {{0.0f, 0.0f}, {w, 0.0f}, {0.0f, h}, {w, h}};
+
+    Mat matrix = getPerspectiveTransform(src, dst);
+    cv::warpPerspective(imageOriginal, imgWarp, matrix, Point(w, h));
+}
+
+// Document scanner
 int main()
 {
-    Mat imageOriginal, imageThre;
+    Mat imageOriginal, imageThre, imageWarp;
     vector<Point> initialpts, docPts;
+    float w = 420.0f, h = 592.0f;
 
     imageOriginal = imread("resources/paper.png" , IMREAD_COLOR);
     if(! imageOriginal.data )
@@ -103,20 +112,22 @@ int main()
         cout <<  "Could not open or find the image" << endl ;
         return -1;
     }
-    //resize(imageOriginal, imageOriginal, cv::Size(), 0.5, 0.5);
 
     // Preprocessing
     imageThre = preProcessImage(imageOriginal);
 
-    // Get Contours - Biggest rectangle
+    // Get Contours of the Biggest rectangle
     initialpts = getContours(imageThre, imageOriginal);
-    //drawPoints(initialpts, Scalar(0, 0, 255), imageOriginal);
+    //drawPoints(initialPoints, Scalar(0, 0, 255));
     docPts = reorder(initialpts);
-    drawPoints(docPts, Scalar(0, 255, 0), imageOriginal);
+    //drawPoints(docPts, Scalar(0, 255, 0), imageOriginal);
+
     // Warp
+    Warp(imageOriginal, imageWarp, docPts, w, h);
 
     imshow("imageOriginal", imageOriginal);
-    imshow("imageThre", imageThre);
+    //imshow("imageThre", imageThre);
+    imshow("imageWarp", imageWarp);
 
     waitKey(0);
     return 0;
