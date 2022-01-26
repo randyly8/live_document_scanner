@@ -66,6 +66,8 @@ cv::Mat preProcessImage(Mat& imageOriginal)
 int main()
 {
     Mat imageOriginal, imageThre;
+    vector<Point> initialpts;
+    
     imageOriginal = imread("resources/paper.png" , IMREAD_COLOR);
     if(! imageOriginal.data )
     {
@@ -78,7 +80,7 @@ int main()
     imageThre = preProcessImage(imageOriginal);
 
     // Get Contours - Biggest rectangle
-    getContours(imageThre);
+    initialpts = getContours(imageThre);
 
     // Warp
 
