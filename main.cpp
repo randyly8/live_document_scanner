@@ -102,7 +102,7 @@ void Warp(Mat& imageOriginal, Mat& imgWarp, vector<Point>& docPts, float& w, flo
 // Document scanner
 int main()
 {
-    Mat imageOriginal, imageThre, imageWarp;
+    Mat imageOriginal, imageThre, imageWarp, imageCrop;
     vector<Point> initialpts, docPts;
     float w = 420.0f, h = 592.0f;
 
@@ -125,9 +125,15 @@ int main()
     // Warp
     Warp(imageOriginal, imageWarp, docPts, w, h);
 
+    // Crop
+    int cropVal = 5;
+	Rect roi(cropVal, cropVal, w - (2 * cropVal), h - (2 * cropVal));
+	imageCrop = imageWarp(roi);
+
     imshow("imageOriginal", imageOriginal);
-    //imshow("imageThre", imageThre);
+    imshow("imageThre", imageThre);
     imshow("imageWarp", imageWarp);
+    imshow("imageCrop", imageCrop);
 
     waitKey(0);
     return 0;
