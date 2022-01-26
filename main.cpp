@@ -60,7 +60,7 @@ vector<Point> getContours(Mat& imageThre, Mat& imageOriginal) {
 }
 
 // Used to draw and label point of a document
-void drawPoints(vector<Point> points, Scalar color, Mat& image)
+void drawPoints(vector<Point>& points, Scalar& color, Mat& image)
 {
     for (int i = 0; i < points.size(); i++)
     {
@@ -102,39 +102,51 @@ void Warp(Mat& imageOriginal, Mat& imgWarp, vector<Point>& docPts, float& w, flo
 // Document scanner
 int main()
 {
+    VideoCapture cap(0);
+    cap.set(CAP_PROP_FRAME_WIDTH , 640);
+    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
+
     Mat imageOriginal, imageThre, imageWarp, imageCrop;
     vector<Point> initialpts, docPts;
     float w = 420.0f, h = 592.0f;
 
-    imageOriginal = imread("resources/paper.png" , IMREAD_COLOR);
-    if(! imageOriginal.data )
+
+    while (true)
     {
-        cout <<  "Could not open or find the image" << endl ;
-        return -1;
+        cap.read(imageOriginal);
+
+        if(! imageOriginal.data )
+        {
+            cout <<  "Could not open or find the image" << endl ;
+            return -1;
+        }
+
+        // Preprocessing
+        imageThre = preProcessImage(imageOriginal);
+
+        // Get Contours of the Biggest rectangle
+        initialpts = getContours(imageThre, imageOriginal);
+        //drawPoints(initialPoints, Scalar(0, 0, 255));
+        if (initialpts.size() > 0)
+        {
+            docPts = reorder(initialpts);
+            //drawPoints(docPts, Scalar(0, 255, 0), imageOriginal);
+
+            // Warp
+            Warp(imageOriginal, imageWarp, docPts, w, h);
+
+            // Crop
+            int cropVal = 5;
+            Rect roi(cropVal, cropVal, w - (2 * cropVal), h - (2 * cropVal));
+            imageCrop = imageWarp(roi);
+
+            imshow("imageOriginal", imageOriginal);
+            //imshow("imageThre", imageThre);
+            //imshow("imageWarp", imageWarp);
+            imshow("imageCrop", imageCrop);
+        }
+
+        waitKey(1);
     }
-
-    // Preprocessing
-    imageThre = preProcessImage(imageOriginal);
-
-    // Get Contours of the Biggest rectangle
-    initialpts = getContours(imageThre, imageOriginal);
-    //drawPoints(initialPoints, Scalar(0, 0, 255));
-    docPts = reorder(initialpts);
-    //drawPoints(docPts, Scalar(0, 255, 0), imageOriginal);
-
-    // Warp
-    Warp(imageOriginal, imageWarp, docPts, w, h);
-
-    // Crop
-    int cropVal = 5;
-	Rect roi(cropVal, cropVal, w - (2 * cropVal), h - (2 * cropVal));
-	imageCrop = imageWarp(roi);
-
-    imshow("imageOriginal", imageOriginal);
-    imshow("imageThre", imageThre);
-    imshow("imageWarp", imageWarp);
-    imshow("imageCrop", imageCrop);
-
-    waitKey(0);
     return 0;
 }
